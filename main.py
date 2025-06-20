@@ -1,28 +1,35 @@
-# youtube_mp3_downloader/main.py
+# youtube_mp3_downloader/app.py
 
-from flask import Flask, request, send_file, jsonify
 import yt_dlp
-import os
 import uuid
+import os
+import streamlit as st
+from pathlib import Path
 
-app = Flask(__name__)
-DOWNLOADS_DIR = "downloads"
-os.makedirs(DOWNLOADS_DIR, exist_ok=True)
+# Create downloads directory
+DOWNLOAD_DIR = Path("downloads")
+DOWNLOAD_DIR.mkdir(exist_ok=True)
 
-@app.route("/download", methods=["POST"])
-def download_audio():
+st.set_page_config(page_title="YouTube to MP3 Downloader", layout="centered")
+st.title("🎵 YouTube to MP3 Downloader")
+st.markdown("""
+Enter a YouTube video URL below and download the audio in MP3 format. Works on mobile and desktop.
+""")
+
+# User input
+url = st.text_input("🔗 YouTube Video URL", placeholder="https://www.youtube.com/watch?v=...")
+download_clicked = st.button("🎧 Download MP3")
+
+# Handle download
+if download_clicked and url:
     try:
-        data = request.json
-        url = data.get("url")
-        if not url:
-            return jsonify({"error": "No URL provided"}), 400
-
+        st.info("Downloading... Please wait")
         filename = f"{uuid.uuid4()}.mp3"
-        output_path = os.path.join(DOWNLOADS_DIR, filename)
+        output_path = DOWNLOAD_DIR / filename
 
         ydl_opts = {
             'format': 'bestaudio/best',
-            'outtmpl': output_path,
+            'outtmpl': str(output_path),
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'mp3',
@@ -34,10 +41,17 @@ def download_audio():
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
 
-        return send_file(output_path, as_attachment=True)
+        with open(output_path, "rb") as f:
+            st.success("Download ready!")
+            st.download_button(
+                label="⬇️ Click here to download MP3",
+                data=f,
+                file_name="youtube_audio.mp3",
+                mime="audio/mpeg"
+            )
 
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        st.error(f"❌ Error: {str(e)}")
 
-if __name__ == "__main__":
-    app.run(debug=True)
+elif download_clicked:
+    st.warning("Please enter a valid YouTube URL")
